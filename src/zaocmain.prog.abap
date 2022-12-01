@@ -30,6 +30,7 @@ class lcl_abstract_solver implementation.
 endclass.
 
 include zaoc2021.
+include zaoc2022.
 
 form main.
   data: lt_filenames type filetable,
