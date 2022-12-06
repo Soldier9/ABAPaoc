@@ -430,3 +430,56 @@ class lcl_202205 implementation.
     enddo.
   endmethod.
 endclass.
+
+
+class lcl_202206 definition final inheriting from lcl_abstract_solver.
+  public section.
+    methods: lif_solver~part1 redefinition,
+             lif_solver~part2 redefinition.
+
+  private section.
+    methods: finduniquesequence
+              importing iv_string type string
+                        iv_length type i
+              returning value(rv_endofseq) type i.
+endclass.
+
+
+class lcl_202206 implementation.
+  method lif_solver~part1.
+    field-symbols: <lv_line> type string.
+
+    read table me->t_input index 1 assigning <lv_line>.
+    rv_return = me->finduniquesequence( iv_string = <lv_line>
+                                        iv_length = 4 ).
+  endmethod.
+
+  method lif_solver~part2.
+    field-symbols: <lv_line> type string.
+
+    read table me->t_input index 1 assigning <lv_line>.
+    rv_return = me->finduniquesequence( iv_string = <lv_line>
+                                        iv_length = 14 ).
+  endmethod.
+
+  method finduniquesequence.
+    data: lt_chars type hashed table of string with unique key table_line,
+          lv_offset1 type i,
+          lv_offset2 type i.
+
+    lv_offset1 = iv_length - 1.
+    while lv_offset1 < strlen( iv_string ).
+      clear lt_chars.
+      lv_offset2 = lv_offset1 - ( iv_length - 1 ).
+      while lv_offset2 <= lv_offset1.
+        insert iv_string+lv_offset2(1) into table lt_chars.
+        lv_offset2 = lv_offset2 + 1.
+      endwhile.
+      if lines( lt_chars ) = iv_length.
+        rv_endofseq = lv_offset1 + 1.
+        return.
+      endif.
+      lv_offset1 = lv_offset1 + 1.
+    endwhile.
+  endmethod.
+endclass.
