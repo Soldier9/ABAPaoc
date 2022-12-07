@@ -483,3 +483,203 @@ class lcl_202206 implementation.
     endwhile.
   endmethod.
 endclass.
+
+
+class lcl_efsFile definition final create private.
+  public section.
+    data: name type string.
+
+    class-methods: create_instance
+                    importing iv_name type string
+                              iv_size type i
+                    returning value(ro_instance) type ref to lcl_efsFile.
+
+    methods: size
+              returning value(rv_size) type i.
+
+  private section.
+    data: _size type i.
+
+    methods: constructor
+              importing iv_name type string
+                        iv_size type i.
+endclass.
+
+class lcl_efsFile implementation.
+  method create_instance.
+    create object ro_instance
+     exporting iv_name = iv_name
+               iv_size = iv_size.
+  endmethod.
+
+  method constructor.
+    me->name = iv_name.
+    me->_size = iv_size.
+  endmethod.
+
+  method size.
+    rv_size = me->_size.
+  endmethod.
+endclass.
+
+class lcl_efsDir definition final create private.
+  public section.
+    types: begin of ty_s_efsEntry,
+             dir type ref to lcl_efsDir,
+             file type ref to lcl_efsFile,
+           end of ty_s_efsEntry.
+
+    data: name type string,
+          o_parent type ref to lcl_efsDir,
+          t_content type standard table of ty_s_efsEntry.
+
+    class-methods: create_instance
+                    importing iv_name type string
+                              iv_parent type ref to lcl_efsDir optional
+                    returning value(ro_instance) type ref to lcl_efsDir.
+
+    methods: size
+              returning value(rv_size) type i,
+             sumDirsUpTo
+              importing iv_limit type i
+              returning value(rv_size) type i,
+             smallestAtLeast
+              importing iv_limit type i
+              returning value(ro_result) type ref to lcl_efsDir.
+
+  private section.
+    methods: constructor
+              importing iv_name type string
+                        iv_parent type ref to lcl_efsDir.
+endclass.
+
+class lcl_efsDir implementation.
+  method create_instance.
+    create object ro_instance
+     exporting iv_name = iv_name
+               iv_parent = iv_parent.
+  endmethod.
+
+  method constructor.
+    me->name = iv_name.
+    if iv_parent is not initial.
+      me->o_parent = iv_parent.
+    endif.
+  endmethod.
+
+  method size.
+    field-symbols: <ls_efsentry> type ty_s_efsentry.
+    loop at me->t_content assigning <ls_efsentry>.
+      if <ls_efsentry>-dir is not initial.
+        rv_size = rv_size + <ls_efsentry>-dir->size( ).
+      else.
+        rv_size = rv_size + <ls_efsentry>-file->size( ).
+      endif.
+    endloop.
+  endmethod.
+
+  method sumDirsUpTo.
+    data: lv_size type i,
+          lo_tmpDir type ref to lcl_efsDir.
+
+    field-symbols: <ls_efsentry> type ty_s_efsEntry.
+
+    lv_size = me->size( ).
+    if lv_size <= iv_limit.
+      rv_size = rv_size + lv_size.
+    endif.
+
+    loop at me->t_content assigning <ls_efsentry>.
+      if <ls_efsentry>-dir is not initial.
+        rv_size = rv_size + <ls_efsentry>-dir->sumDirsUpTo( iv_limit ).
+      endif.
+    endloop.
+  endmethod.
+
+  method smallestAtLeast.
+    data: lv_size type i,
+          lo_other type ref to lcl_efsdir.
+
+    field-symbols: <ls_efsentry> type ty_s_efsentry.
+
+    loop at me->t_content assigning <ls_efsentry>
+                          where dir is not initial.
+      lv_size = <ls_efsentry>-dir->size( ).
+      if lv_size >= iv_limit and ( ro_result is initial or ro_result->size( ) > lv_size ).
+        ro_result = <ls_efsentry>-dir.
+      endif.
+
+      lo_other = <ls_efsentry>-dir->smallestAtLeast( iv_limit ).
+      if lo_other is not initial and ( ro_result is initial or ro_result->size( ) > lo_other->size( ) ).
+        ro_result = lo_other.
+      endif.
+    endloop.
+  endmethod.
+endclass.
+
+class lcl_202207 definition final inheriting from lcl_abstract_solver.
+  public section.
+    methods: lif_solver~part1 redefinition,
+             lif_solver~part2 redefinition.
+
+  private section.
+    data: o_efs type ref to lcl_efsdir.
+endclass.
+
+
+class lcl_202207 implementation.
+  method lif_solver~part1.
+    data: lv_part1 type string,
+          lv_part2 type string,
+          lo_tmpDir type ref to lcl_efsDir,
+          lo_tmpFile type ref to lcl_efsFile,
+          lv_size type i.
+
+    field-symbols: <lv_line> type string,
+                   <lo_pwd> type ref to lcl_efsDir,
+                   <ls_efsentry> type lcl_efsDir=>ty_s_efsEntry.
+
+    me->o_efs = lcl_efsdir=>create_instance( `/` ).
+
+    loop at me->t_input assigning <lv_line>.
+      if <lv_line>+0(1) = `$`.
+        split <lv_line>+2 at ` ` into lv_part1 lv_part2.
+        if lv_part1 = `cd`.
+          if lv_part2 = `/`. assign me->o_efs to <lo_pwd>.
+          elseif lv_part2 = `..`. assign <lo_pwd>->o_parent to <lo_pwd>.
+          else.
+            loop at <lo_pwd>->t_content assigning <ls_efsentry>.
+              if <ls_efsentry>-dir is not initial and <ls_efsentry>-dir->name = lv_part2.
+                assign <ls_efsentry>-dir to <lo_pwd>.
+                exit.
+              endif.
+            endloop.
+          endif.
+        endif.
+      else.
+        split <lv_line> at ` ` into lv_part1 lv_part2.
+        append initial line to <lo_pwd>->t_content assigning <ls_efsentry>.
+        if lv_part1 = `dir`.
+          <ls_efsentry>-dir = lcl_efsDir=>create_instance( iv_name   = lv_part2
+                                                           iv_parent = <lo_pwd> ).
+        else.
+          lv_size = lv_part1.
+          <ls_efsentry>-file = lcl_efsFile=>create_instance( iv_name = lv_part2
+                                                             iv_size = lv_size ).
+        endif.
+      endif.
+    endloop.
+
+    rv_return = me->o_efs->sumDirsUpTo( 100000 ).
+  endmethod.
+
+  method lif_solver~part2.
+    data: lv_freespace type i,
+          lv_neededspace type i.
+
+    lv_freespace = 70000000 - me->o_efs->size( ).
+    lv_neededspace = 30000000 - lv_freespace.
+
+    rv_return = me->o_efs->smallestAtLeast( lv_neededspace )->size( ).
+  endmethod.
+endclass.
