@@ -683,3 +683,147 @@ class lcl_202207 implementation.
     rv_return = me->o_efs->smallestAtLeast( lv_neededspace )->size( ).
   endmethod.
 endclass.
+
+
+class lcl_202208 definition final inheriting from lcl_abstract_solver.
+  public section.
+    methods: lif_solver~part1 redefinition,
+             lif_solver~part2 redefinition.
+
+  private section.
+    data: width type i,
+          height type i.
+endclass.
+
+
+class lcl_202208 implementation.
+  method lif_solver~part1.
+    data: lv_x type i,
+          lv_y type i,
+          lv_x2 type i,
+          lv_y2 type i,
+          lv_visible type i,
+          lv_isvisible type abap_bool.
+
+    field-symbols: <lv_line> type string,
+                   <lv_line2> type string.
+
+    read table me->t_input index 1 assigning <lv_line>.
+    me->height = lines( me->t_input ).
+    me->width = strlen( <lv_line> ).
+
+    lv_y = 1.
+    while lv_y <= me->height.
+      read table me->t_input index lv_y assigning <lv_line>.
+      lv_x = -1.
+      while lv_x < me->width - 1.
+        lv_x = lv_x + 1. " Increment at the start of loop because of the use of continue!
+        if lv_x = 0 or lv_y = 1 or lv_x = me->width - 1 or lv_y = me->height.
+          lv_visible = lv_visible + 1.
+        else.
+          lv_isvisible = abap_true.
+          lv_x2 = lv_x - 1.
+          while lv_x2 >= 0.
+            if <lv_line>+lv_x2(1) >= <lv_line>+lv_x(1). lv_isvisible = abap_false. exit. endif.
+            lv_x2 = lv_x2 - 1.
+          endwhile.
+          if lv_isvisible = abap_true. lv_visible = lv_visible + 1. continue. endif.
+
+          lv_isvisible = abap_true.
+          lv_x2 = lv_x + 1.
+          while lv_x2 < me->width.
+            if <lv_line>+lv_x2(1) >= <lv_line>+lv_x(1). lv_isvisible = abap_false. exit. endif.
+            lv_x2 = lv_x2 + 1.
+          endwhile.
+          if lv_isvisible = abap_true. lv_visible = lv_visible + 1. continue. endif.
+
+          lv_isvisible = abap_true.
+          lv_y2 = lv_y - 1.
+          while lv_y2 > 0.
+            read table me->t_input index lv_y2 assigning <lv_line2>.
+            if <lv_line2>+lv_x(1) >= <lv_line>+lv_x(1). lv_isvisible = abap_false. exit. endif.
+            lv_y2 = lv_y2 - 1.
+          endwhile.
+          if lv_isvisible = abap_true. lv_visible = lv_visible + 1. continue. endif.
+
+          lv_isvisible = abap_true.
+          lv_y2 = lv_y + 1.
+          while lv_y2 <= me->height.
+            read table me->t_input index lv_y2 assigning <lv_line2>.
+            if <lv_line2>+lv_x(1) >= <lv_line>+lv_x(1). lv_isvisible = abap_false. exit. endif.
+            lv_y2 = lv_y2 + 1.
+          endwhile.
+          if lv_isvisible = abap_true. lv_visible = lv_visible + 1. endif.
+        endif.
+      endwhile.
+      lv_y = lv_y + 1.
+    endwhile.
+
+    rv_return = lv_visible.
+  endmethod.
+  method lif_solver~part2.
+    data: lv_x type i,
+          lv_y type i,
+          lv_x2 type i,
+          lv_y2 type i,
+          lv_bestscore type i,
+          lv_treescore type i,
+          lv_dirscore type i.
+
+    field-symbols: <lv_line> type string,
+                   <lv_line2> type string.
+    lv_y = 1.
+    while lv_y <= me->height.
+      read table me->t_input index lv_y assigning <lv_line>.
+      lv_x = -1.
+      while lv_x < me->width - 1.
+        lv_x = lv_x + 1. " Increment at the start of loop because of the use of continue!
+
+        lv_treescore = 1.
+        lv_dirscore = 0.
+        lv_x2 = lv_x - 1.
+        while lv_x2 >= 0.
+          lv_dirscore = lv_dirscore + 1.
+          if <lv_line>+lv_x2(1) >= <lv_line>+lv_x(1). exit. endif.
+          lv_x2 = lv_x2 - 1.
+        endwhile.
+        lv_treescore = lv_treescore * lv_dirscore.
+
+        lv_dirscore = 0.
+        lv_x2 = lv_x + 1.
+        while lv_x2 < me->width.
+          lv_dirscore = lv_dirscore + 1.
+          if <lv_line>+lv_x2(1) >= <lv_line>+lv_x(1). exit. endif.
+          lv_x2 = lv_x2 + 1.
+        endwhile.
+        lv_treescore = lv_treescore * lv_dirscore.
+
+        lv_dirscore = 0.
+        lv_y2 = lv_y - 1.
+        while lv_y2 > 0.
+          lv_dirscore = lv_dirscore + 1.
+          read table me->t_input index lv_y2 assigning <lv_line2>.
+          if <lv_line2>+lv_x(1) >= <lv_line>+lv_x(1). exit. endif.
+          lv_y2 = lv_y2 - 1.
+        endwhile.
+        lv_treescore = lv_treescore * lv_dirscore.
+
+        lv_dirscore = 0.
+        lv_y2 = lv_y + 1.
+        while lv_y2 <= me->height.
+          lv_dirscore = lv_dirscore + 1.
+          read table me->t_input index lv_y2 assigning <lv_line2>.
+          if <lv_line2>+lv_x(1) >= <lv_line>+lv_x(1). exit. endif.
+          lv_y2 = lv_y2 + 1.
+        endwhile.
+        lv_treescore = lv_treescore * lv_dirscore.
+
+        lv_bestscore = nmax( val1 = lv_bestscore
+                             val2 = lv_treescore ).
+      endwhile.
+      lv_y = lv_y + 1.
+    endwhile.
+
+    rv_return = lv_bestscore.
+  endmethod.
+endclass.
