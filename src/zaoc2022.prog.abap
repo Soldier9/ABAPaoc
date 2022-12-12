@@ -851,7 +851,6 @@ class lcl_202209 definition final inheriting from lcl_abstract_solver.
               returning value(rs_tail) type ty_s_ropepos.
 endclass.
 
-
 class lcl_202209 implementation.
   method lif_solver~part1.
     data: lt_rope type ty_t_rope,
@@ -958,5 +957,96 @@ class lcl_202209 implementation.
     endloop.
 
     rv_return = lines( lt_visited ).
+  endmethod.
+endclass.
+
+
+class lcl_202210 definition final inheriting from lcl_abstract_solver.
+  public section.
+    methods: lif_solver~part1 redefinition,
+             lif_solver~part2 redefinition.
+endclass.
+
+class lcl_202210 implementation.
+  method lif_solver~part1.
+    data: lv_nextinstruction type i value 0,
+          lv_cycle type i value 1,
+          lv_curinstrend type i value 0,
+          lv_nextinstrload type i value 1,
+          lv_regx type i value 1,
+          lv_result type i.
+
+    field-symbols: <lv_line> type string.
+
+    while lv_nextinstruction < lines( me->t_input ).
+      if lv_cycle = lv_nextinstrload.
+        lv_nextinstruction = lv_nextinstruction + 1.
+        read table me->t_input index lv_nextinstruction assigning <lv_line>.
+        if <lv_line> = `noop`.
+          lv_nextinstrload = lv_cycle + 1.
+          lv_curinstrend = lv_cycle.
+        else.
+          lv_nextinstrload = lv_cycle + 2.
+          lv_curinstrend = lv_cycle + 1.
+        endif.
+      endif.
+
+      if ( lv_cycle + 20 ) mod 40 = 0.
+        lv_result = lv_result + ( lv_cycle * lv_regx ).
+      endif.
+
+      if lv_cycle = lv_curinstrend.
+        if <lv_line>+0(4) = `addx`.
+          lv_regx = lv_regx + <lv_line>+4.
+        endif.
+      endif.
+      lv_cycle = lv_cycle + 1.
+    endwhile.
+    rv_return = lv_result.
+  endmethod.
+
+  method lif_solver~part2.
+    data: lv_nextinstruction type i value 0,
+          lv_cycle type i value 1,
+          lv_curinstrend type i value 0,
+          lv_nextinstrload type i value 1,
+          lv_regx type i value 1,
+          lv_line type c length 40,
+          lv_col type i value 0.
+
+    field-symbols: <lv_line> type string.
+
+    while lv_nextinstruction < lines( me->t_input ).
+      if lv_cycle = lv_nextinstrload.
+        lv_nextinstruction = lv_nextinstruction + 1.
+        read table me->t_input index lv_nextinstruction assigning <lv_line>.
+        if <lv_line> = `noop`.
+          lv_nextinstrload = lv_cycle + 1.
+          lv_curinstrend = lv_cycle.
+        else.
+          lv_nextinstrload = lv_cycle + 2.
+          lv_curinstrend = lv_cycle + 1.
+        endif.
+      endif.
+
+      lv_col = ( lv_cycle - 1 ) mod 40.
+      if abs( lv_col - lv_regx ) < 2.
+        lv_line+lv_col(1) = '#'.
+      else.
+        lv_line+lv_col(1) = ' '.
+      endif.
+      if lv_col = 39.
+        write: / lv_line.
+        clear lv_line.
+      endif.
+
+      if lv_cycle = lv_curinstrend.
+        if <lv_line>+0(4) = `addx`.
+          lv_regx = lv_regx + <lv_line>+4.
+        endif.
+      endif.
+      lv_cycle = lv_cycle + 1.
+    endwhile.
+    rv_return = `Above`.
   endmethod.
 endclass.
