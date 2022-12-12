@@ -827,3 +827,136 @@ class lcl_202208 implementation.
     rv_return = lv_bestscore.
   endmethod.
 endclass.
+
+
+class lcl_202209 definition final inheriting from lcl_abstract_solver.
+  public section.
+    methods: lif_solver~part1 redefinition,
+             lif_solver~part2 redefinition.
+
+  private section.
+    types: begin of ty_s_ropepos,
+             x type i,
+             y type i,
+           end of ty_s_ropepos,
+           ty_t_rope type standard table of ty_s_ropepos.
+
+    methods: touching
+              importing is_head type ty_s_ropepos
+                        is_tail type ty_s_ropepos
+              returning value(rv_return) type abap_bool,
+             movetail
+              importing is_head type ty_s_ropepos
+                        is_tail type ty_s_ropepos
+              returning value(rs_tail) type ty_s_ropepos.
+endclass.
+
+
+class lcl_202209 implementation.
+  method lif_solver~part1.
+    data: lt_rope type ty_t_rope,
+          lv_count type i,
+          lt_visited type hashed table of ty_s_ropepos with unique key table_line.
+
+    field-symbols: <ls_line> type string,
+                   <ls_head> type ty_s_ropepos,
+                   <ls_tail> type ty_s_ropepos.
+
+    append initial line to lt_rope assigning <ls_head>.
+    append initial line to lt_rope assigning <ls_tail>.
+    insert <ls_tail> into table lt_visited.
+
+    loop at me->t_input assigning <ls_line>.
+      lv_count = <ls_line>+2.
+      do lv_count times.
+        case <ls_line>+0(1).
+          when 'U'. <ls_head>-y = <ls_head>-y - 1.
+          when 'R'. <ls_head>-x = <ls_head>-x + 1.
+          when 'D'. <ls_head>-y = <ls_head>-y + 1.
+          when 'L'. <ls_head>-x = <ls_head>-x - 1.
+        endcase.
+
+        while me->touching( is_head = <ls_head>
+                            is_tail = <ls_tail> ) = abap_false.
+          <ls_tail> = me->movetail( is_head = <ls_head>
+                                    is_tail = <ls_tail> ).
+        endwhile.
+        insert <ls_tail> into table lt_visited.
+      enddo.
+    endloop.
+
+    rv_return = lines( lt_visited ).
+  endmethod.
+
+  method touching.
+    data: lv_xdist type i,
+          lv_ydist type i.
+
+    lv_xdist = abs( is_head-x - is_tail-x ).
+    lv_ydist = abs( is_head-y - is_tail-y ).
+    if nmax( val1 = lv_xdist
+             val2 = lv_ydist ) < 2.
+      rv_return = abap_true.
+    endif.
+  endmethod.
+
+  method movetail.
+    if is_head-x = is_tail-x.
+      rs_tail-x = is_tail-x.
+      if is_head-y > is_tail-y. rs_tail-y = is_tail-y + 1.
+      else. rs_tail-y = is_tail-y - 1. endif.
+    elseif is_head-y = is_tail-y.
+      rs_tail-y = is_tail-y.
+      if is_head-x > is_tail-x. rs_tail-x = is_tail-x + 1.
+      else. rs_tail-x = is_tail-x - 1. endif.
+    else.
+      if is_head-x > is_tail-x. rs_tail-x = is_tail-x + 1.
+      else. rs_tail-x = is_tail-x - 1. endif.
+      if is_head-y > is_tail-y. rs_tail-y = is_tail-y + 1.
+      else. rs_tail-y = is_tail-y - 1. endif.
+    endif.
+  endmethod.
+
+  method lif_solver~part2.
+    data: lt_rope type ty_t_rope,
+          lv_count type i,
+          lt_visited type hashed table of ty_s_ropepos with unique key table_line.
+
+    field-symbols: <ls_line> type string,
+                   <ls_head> type ty_s_ropepos,
+                   <ls_tail> type ty_s_ropepos.
+
+    append initial line to lt_rope assigning <ls_head>.
+    do 9 times.
+      append initial line to lt_rope assigning <ls_tail>.
+    enddo.
+    insert <ls_tail> into table lt_visited.
+
+    loop at me->t_input assigning <ls_line>.
+      lv_count = <ls_line>+2.
+      do lv_count times.
+        read table lt_rope index 1 assigning <ls_head>.
+        case <ls_line>+0(1).
+          when 'U'. <ls_head>-y = <ls_head>-y - 1.
+          when 'R'. <ls_head>-x = <ls_head>-x + 1.
+          when 'D'. <ls_head>-y = <ls_head>-y + 1.
+          when 'L'. <ls_head>-x = <ls_head>-x - 1.
+        endcase.
+
+        loop at lt_rope assigning <ls_head>.
+          if sy-tabix < lines( lt_rope ).
+            read table lt_rope index sy-tabix + 1 assigning <ls_tail>.
+            while me->touching( is_head = <ls_head>
+                                is_tail = <ls_tail> ) = abap_false.
+              <ls_tail> = me->movetail( is_head = <ls_head>
+                                        is_tail = <ls_tail> ).
+            endwhile.
+          endif.
+        endloop.
+        insert <ls_head> into table lt_visited. " here <ls_head> is the very last segment, so the tail...
+      enddo.
+    endloop.
+
+    rv_return = lines( lt_visited ).
+  endmethod.
+endclass.
